@@ -1,20 +1,19 @@
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 # from assit import assit
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 def update_camera_view(ax, d, aspect_ratio, camera_pos, azimuth, elevation, focal_length, R1, R2, R3, dtc, oi):
 
     # 清除坐标系中的所有几何面
-    ax.collections.clear
-    
+    ax.collections.clear()
+
     # 清除相机视场图像
     lines = ax.get_lines()
     for line in lines:
         if line.get_color() in ['lightblue']:
             ax.lines.remove(line)
-    ax.clear()
+
     azimuth_g = np.deg2rad(azimuth)  # 将角度转换为弧度
     elevation_g = np.deg2rad(elevation)  # 将角度转换为弧度
 
