@@ -1,10 +1,10 @@
 import numpy as np
 import gym
 from gym import spaces
-from air_line import generate
 import reco
 from assit import assit
 import guidance
+import json
 from clamp_angle import clamp_angle
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -93,7 +93,15 @@ class CameraControlEnv(gym.Env):
         self.target_point = np.array([- 900, - 1200, 200])
         self.total_time = 120
         self.max_speed = 25
-        self.trajectory = generate(self.start_point, self.target_point, self.total_time, self.max_speed, self.camera_pos)
+        # 构建文件的绝对路径
+        file_path = 'tmpkw.json'
+        # 读取 JSON 文件
+        with open(file_path, "r") as file:
+            data = json.load(file)
+        # 打印输出 UAV 的数据
+        uav_data = data.get("UAV", [])
+        self.trajectory = uav_data
+        self.uav_var_count = len(uav_data)
         self.shared_data = SharedData()
 
     def reset(self):
@@ -102,7 +110,7 @@ class CameraControlEnv(gym.Env):
         self.shared_data.focal_length = 0.0043
         self.shared_data.gud_a = 0  # 新增：重置gud_a为0
         self.shared_data.gud_e = 0  # 新增：重置gud_e为0
-        self.x, self.y, self.z = self.start_point
+        self.x, self.y, self.z = self.trajectory[0]
         self.shared_data.velocity = self.max_speed  # 新增：重置速度为max_speed
         self.shared_data.acceleration = 0  # 新增：重置加速度为0
         self.trigger_condition = False
@@ -146,7 +154,7 @@ class CameraControlEnv(gym.Env):
         self.current_t += t
         reward, reward1 = self.calculate_reward()
         state = self.get_state()
-        done = self.current_t >= self.total_time * 10 or reward1 == 100
+        done = self.current_t >= self.uav_var_count or reward1 == 100
         # print(f"{self.current_t, done}")
         if self.trigger_condition:
             reward += self.reward_compensation
@@ -216,9 +224,10 @@ class CameraControlEnv(gym.Env):
         # 逐步逼近奖励
         azimuth_diff1 = np.abs(azimuth - self.gud_a)
         elevation_diff1 = np.abs(elevation - self.gud_e)
+        
         if azimuth_diff1 <= 5 and elevation_diff1 <= 5:
-            # print('correct', end=' ')
-            reward0 = 0
+            print('correct', end=' ')
+            reward0 = 1
         else:
             # print('false', end=' ')
             reward0 = 0
@@ -236,15 +245,7 @@ class CameraControlEnv(gym.Env):
 
         pg = 1 if p1 == 1 and p2 == 1 else 0
 
-        g = reco.recog(distance, focal_length)
-
-        R1, R2, R3 = assit(focal_length)
-
-        if distance > R3 and focal_length == 0.0043:
-            reward2 = 1
-        else:
-            reward2 = 0
-            
+        g = reco.recog(distance, focal_length)          
 
         # 辨认奖励的计算
         if (pg == 1):
@@ -254,7 +255,7 @@ class CameraControlEnv(gym.Env):
                 # print(f"{a1, a2, azimuth_deg}")
                 reward1 = 100
                 self.trigger_condition = True
-                reward = reward0 + reward1 + reward2
+                reward = reward0 + reward1
                 return reward, reward1
             else:
                 if g == 2:
@@ -262,7 +263,7 @@ class CameraControlEnv(gym.Env):
                     # print('recognition')
                     # print(f"{a1, a2, azimuth_deg}")
                     reward1 = 50
-                    reward = reward0 + reward1 + reward2
+                    reward = reward0 + reward1
                     return reward, reward1
                 else:
                     if g == 1:
@@ -270,16 +271,16 @@ class CameraControlEnv(gym.Env):
                         # print('detection')
                         # print(f"{a1, a2, azimuth_deg}")
                         reward1 = 20
-                        reward = reward0 + reward1 + reward2
+                        reward = reward0 + reward1
                         return reward, reward1
                     else:
                         # 未识别目标
                         # print('undetection')
                         reward1 = 0
-                        reward = reward0 + reward1 + reward2
+                        reward = reward0 + reward1
                         return reward, reward1
         else:
             # print('none')
             reward1 = 0
-            reward = reward0 + reward1 + reward2
+            reward = reward0 + reward1
             return reward, reward1

@@ -1,7 +1,7 @@
 from SAC import SAC  # SAC类是你提供的SAC算法实现
 from env import CameraControlEnv  # CameraControlEnv是你的自定义环境
 import numpy as np
-import random
+import json
 import os
 
 # 创建相机控制环境
@@ -39,61 +39,47 @@ if os.path.exists(buffer_save_path):
 else:
     print("No saved Replay Buffer found. Starting with an empty buffer.")
 
-max_episodes = 10
+# 构建文件的绝对路径
+file_path = 'tmpkw.json'
 
-camera_pos = np.array([0, 0, 0])
+# 读取 JSON 文件
+with open(file_path, "r") as file:
+    data = json.load(file)
+
+# 打印输出 Defender 的数据
+defender_data = data.get("Defender", [])
+defender_var_count = len(defender_data)
+#print(defender_data)
 
 # 循环与代理交互并手动输入经验
-for episode in range(max_episodes):
-    state = env.reset()
-    total_reward = 0
-    done = False
+state = env.reset()
+total_reward = 0
+done = False
+n = 0
 
-    while not done:
-        azimuth, elevation, focal_length, gud_a, gud_e, v, a, x, y, z, current_t = state
-        # 计算目标相对于相机的位置矢量
-        target_vector = np.array([x, y, z]) - camera_pos
+while not done:
+    azimuth, elevation, focal_length, gud_a, gud_e, v, a, x, y, z, current_t = state
+    observation = state[:5]
 
-        # 计算俯角和仰角
-        distance = np.linalg.norm(target_vector)
-        elevation_rad = np.arcsin(target_vector[2] / distance)
-        azimuth_rad = np.arctan2(target_vector[1], target_vector[0])
+    if n < defender_var_count - 1:
+        action = [defender_data[n + 1][i] - defender_data[n][i] for i in range(len(defender_data[0]))]
+        n = n + 1
+        #print(n)
+    else:
+        action = [0, 0, 0]
+    #print(action)
 
-        elevation_deg = np.rad2deg(elevation_rad)
-        elevation_deg = round(elevation_deg, 2)
-
-        azimuth_deg = np.rad2deg(azimuth_rad)
-        azimuth_deg = round(azimuth_deg, 2)
-
-        a1 = 1 * random.uniform(0, 1)
-        e1 = 1 * random.uniform(0, 1)
-
-        observation = state[:5]
-        azimuth, elevation, focal_length, gud_a, gud_e = observation
-        azimuth1 = azimuth_deg - azimuth
-        elevation1 = elevation_deg - elevation
-        # print(f"{azimuth, elevation, focal_length, gud_a, gud_e}")
-        # print(f"{azimuth_deg, elevation_deg, distance}")
-        act1 = azimuth1 + a1
-        act2 = elevation1 + e1
-        n = 0
-        if current_t <= 3600:
-             focal = 0.001
-        else:
-            focal = - 0.001       
-        action = np.array([act1, act2, focal])
-
-        next_state, reward, done, _ = env.step(action)
-        # 打印获得的奖励
-        # print(f"Reward: {reward}")
-        next_observation = next_state[:5]
-        agent.buffer.push(observation, action, reward, next_observation, done)
-        # print(f"{len(agent.buffer)}")
-        # 保存 Replay Buffer
-        state = next_state
-        total_reward += reward
+    next_state, reward, done, _ = env.step(action)
+    # 打印获得的奖励
+    # print(f"Reward: {reward}")
+    next_observation = next_state[:5]
+    agent.buffer.push(observation, action, reward, next_observation, done)
+    # print(f"{len(agent.buffer)}")
+    # 保存 Replay Buffer
+    state = next_state
+    total_reward += reward
     
-    print(f"Episode: {episode + 1}, Total Reward: {total_reward}")
+print(f"Total Reward: {total_reward}")
 
 # 关闭环境
 env.close()
