@@ -74,23 +74,21 @@ for episode in range(max_episodes):
         elevation1 = elevation_deg - elevation
 
         act1 = azimuth1 + a1
+        
         if act1 >= 6:
             act1 = 6
         else:
             if act1 <= -6:
                 act1 = -6
         act2 = elevation1 + e1
+
         if act2 >= 6:
             act2 = 6
         else:
             if act2 <= -6:
                 act2 = -6
 
-        if current_t <= 801:
-            focal = 0.006
-        else:
-            focal = -0.006       
-        action = np.array([act1, act2, focal])
+        action = np.array([act1, act2])
         #print(action)
 
         next_state, reward, done, _ = env.step(action)

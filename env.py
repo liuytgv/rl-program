@@ -4,6 +4,7 @@ from gym import spaces
 import reco
 import guidance
 import json
+from assit import assit
 from clamp_angle import clamp_angle
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -57,7 +58,7 @@ class CameraControlEnv(gym.Env):
         # 定义连续动作空间，例如控制相机方位角、俯仰角和焦距的连续值
         self.state_dim = 9  # 新增：状态空间为11维
         self.observation_dim = 5
-        self.action_dim = 3  # 动作维度为3维，包括方位角、俯仰角、焦距
+        self.action_dim = 2  # 动作维度为2维，包括方位角、俯仰角
         self.total_reward = 0
 
         # 状态空间的定义，包括方位角、俯仰角、焦距、gud_a、gud_e、速度和加速度
@@ -71,8 +72,8 @@ class CameraControlEnv(gym.Env):
 
         # 新增：定义包含连续动作的连续动作空间，每个维度有相应的范围
         self.action_space = spaces.Box(
-            low=np.array([-6, -6, -0.006], dtype=np.float32),
-            high=np.array([6, 6, 0.006], dtype=np.float32),
+            low=np.array([-6, -6], dtype=np.float32),
+            high=np.array([6, 6], dtype=np.float32),
             dtype=np.float32
         )
 
@@ -111,23 +112,15 @@ class CameraControlEnv(gym.Env):
         return state
 
     def step(self, action):
-        azimuth_1, elevation_1, focal_length1 = action
+        azimuth_1, elevation_1 = action
 
         # 获取上一个状态的azimuth和elevation
         prev_azimuth = self.shared_data.azimuth
         prev_elevation = self.shared_data.elevation
-        prev_focal_length = self.shared_data.focal_length
 
         # 计算azimuth和elevation相对于上一个状态的变化
         azimuth = prev_azimuth + azimuth_1
-        elevation = prev_elevation + elevation_1
-        focal_length = prev_focal_length + focal_length1
-
-        if focal_length > 0.129:
-            focal_length = 0.129           
-        if focal_length < 0.0043:
-            focal_length = 0.0043
-            
+        elevation = prev_elevation + elevation_1           
         if elevation > 90:
             elevation = 90
         if elevation < -120:
@@ -138,9 +131,28 @@ class CameraControlEnv(gym.Env):
         # 将动作应用于相机的方位角、俯仰角和焦距
         self.shared_data.azimuth = azimuth
         self.shared_data.elevation = elevation
-        self.shared_data.focal_length = focal_length
         
         self.x, self.y, self.z = self.trajectory[self.current_t] - self.camera_pos
+
+        prev_focal_length = self.shared_data.focal_length
+        _, _, R3 = assit(prev_focal_length)
+        target_vector = np.array([self.x, self.y, self.z])
+        distance = np.linalg.norm(target_vector)
+
+        if distance >= R3:
+            focal_action = -0.006
+        else:
+            focal_action = 0.006
+        
+        focal_length = prev_focal_length + focal_action
+
+        if focal_length > 0.129:
+            focal_length = 0.129           
+        if focal_length < 0.0043:
+            focal_length = 0.0043
+        
+        self.shared_data.focal_length = focal_length
+
         self.current_t += 1
         state = self.get_state()
         reward, reward1 = self.calculate_reward()
@@ -214,9 +226,6 @@ class CameraControlEnv(gym.Env):
         self.shared_data.gud_e = self.gud_e
         self.shared_data.gud_a = self.gud_a
         # print(f"{self.gud_a, self.gud_e, azimuth_deg, elevation_deg}")
-
-        # 逐步逼近奖励
-        elevation_diff1 = np.abs(elevation - self.gud_e)
         
         # print(f"{reward2}")
         
