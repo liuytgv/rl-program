@@ -33,16 +33,16 @@ state_dim = env.observation_space.shape[0]
 action_dim = env.action_space.shape[0]
 
 sac_args = {
-    'gamma': 0.999,  # 折扣率，控制未来奖励的重要性0.99
+    'gamma': 0.99,  # 折扣率，控制未来奖励的重要性0.99
     'tau': 0.005,  # 软更新参数，控制目标网络的平滑更新
     'alpha': 0.4,  # 熵调节参数，控制策略的探索程度0.2
     'policy': 'Gaussian',  # 策略类型，可以是Gaussian或Deterministic策略
-    'target_update_interval': 1,  # 目标网络更新的频率
+    'target_update_interval': 10,  # 目标网络更新的频率
     'automatic_entropy_tuning': True,  # 是否自动调节熵参数
     'cuda': True,
-    'hidden_size': 1024,  # Critic和Actor网络的隐藏层大小
+    'hidden_size': 256,  # Critic和Actor网络的隐藏层大小
     'lr': 0.001,  # 学习率0.0001
-    'buffer_capacity': 10000000,  # 添加buffer_capacity属性
+    'buffer_capacity': 100000000,  # 添加buffer_capacity属性
     'seed': 256  # 添加seed属性
 }
 
@@ -55,7 +55,7 @@ agent = SAC(state_dim, env.action_space, sac_args)
 
 # 定义目录路径以加载模型参数
 load_dir = 'sac_model'
-load_episode = 3000  # 你想加载的训练轮次对应的模型参数
+load_episode = 100  # 你想加载的训练轮次对应的模型参数
 
 # 加载模型参数
 agent.load_model(load_dir, 'sac', load_episode, evaluate=True)
@@ -94,7 +94,7 @@ for episode in range(num_episodes):
 
     while not done:
         observation = state[:5]
-        azimuth, elevation, focal_length, gud_a, gud_e, v, a, x, y, z, current_t = state
+        azimuth, elevation, focal_length, gud_a, gud_e, x, y, z, current_t = state
         azimuth = round(azimuth, 2)
         elevation = round(elevation, 2)
         camera_pos = np.array([0, 0, 0])
@@ -144,7 +144,7 @@ def update_plot(frame):
     global scatter  # 声明为 global，以便在整个函数范围内都可见
 
     state = all_states[frame]
-    azimuth, elevation, focal_length, gud_a, gud_e, v, a, x, y, z, current_t = state
+    azimuth, elevation, focal_length, gud_a, gud_e, x, y, z, current_t = state
     azimuth = round(azimuth, 2)
     elevation = round(elevation, 2)
     action =actions[frame]
@@ -197,6 +197,9 @@ def update_plot(frame):
     # 清除当前设置的内容
     annotation1.set_text("")
     distance1 = round(distance, 2)
+    x = round(x, 2)
+    y = round(y, 2)
+    z = round(z, 2)
 
     # 更新文本注释内容
     info_text1 = f'UAV:\n\n'\
@@ -205,7 +208,7 @@ def update_plot(frame):
             f'Position: {[x, y, z]}\n\n'\
             f'Height: {z} m\n\n'\
             f'Distance: {distance1} m\n\n'\
-            f'v: {v} m/s  ' 
+            f'v: {25} m/s  ' 
 
     progress1 = abs(gud_a - azimuth)
     progress1 = round(progress1, 2)

@@ -102,7 +102,7 @@ class SAC(object):
         lr = args['lr'] # 学习率
 
         self.critic = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(self.device)
-        self.critic_optim = Adam(self.critic.parameters(), lr=lr)
+        self.critic_optim = Adam(self.critic.parameters(), lr=lr) # 价值网络的优化器定义
 
         self.critic_target = QNetwork(num_inputs, action_space.shape[0], hidden_size).to(self.device)
         hard_update(self.critic_target, self.critic)
@@ -112,10 +112,10 @@ class SAC(object):
             if self.automatic_entropy_tuning:
                 self.target_entropy = -torch.prod(torch.Tensor(action_space.shape).to(self.device)).item()
                 self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
-                self.alpha_optim = Adam([self.log_alpha], lr=lr)
+                self.alpha_optim = Adam([self.log_alpha], lr=lr) # 温度参数以及优化器定义
 
-            self.policy = GaussianPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
-            self.policy_optim = Adam(self.policy.parameters(), lr=lr)
+            self.policy = GaussianPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device) # 创建Actor网络
+            self.policy_optim = Adam(self.policy.parameters(), lr=lr) # 策略优化器定义
 
         else:
             self.alpha = 0
@@ -123,7 +123,7 @@ class SAC(object):
             self.policy = DeterministicPolicy(num_inputs, action_space.shape[0], hidden_size, action_space).to(self.device)
             self.policy_optim = Adam(self.policy.parameters(), lr=lr)
 
-    def select_action(self, state, evaluate=False):
+    def select_action(self, state, evaluate=False): # 输出随机策略动作
         state = torch.FloatTensor(state).to(self.device).unsqueeze(0)
         if evaluate is False:
             action, _, _ = self.policy.sample(state)
@@ -133,6 +133,7 @@ class SAC(object):
 
     def update_parameters(self, memory, batch_size, updates):
         # Sample a batch from memory
+        # 对价值网络进行训练
         state_batch, action_batch, reward_batch, next_state_batch, mask_batch = memory.sample(batch_size=batch_size)
 
         state_batch = torch.FloatTensor(state_batch).to(self.device)
@@ -155,6 +156,7 @@ class SAC(object):
         qf_loss.backward()
         self.critic_optim.step()
 
+        # 对策略网络进行训练
         pi, log_pi, _ = self.policy.sample(state_batch)
 
         qf1_pi, qf2_pi = self.critic(state_batch, pi)
@@ -166,6 +168,7 @@ class SAC(object):
         policy_loss.backward()
         self.policy_optim.step()
 
+        # 温度参数自适应调节
         if self.automatic_entropy_tuning:
             alpha_loss = -(self.log_alpha * (log_pi + self.target_entropy).detach()).mean()
 
@@ -179,13 +182,13 @@ class SAC(object):
             alpha_loss = torch.tensor(0.).to(self.device)
             alpha_tlogs = torch.tensor(self.alpha) # For TensorboardX logs
 
-
+        # 目标网络参数软更新
         if updates % self.target_update_interval == 0:
             soft_update(self.critic_target, self.critic, self.tau)
 
         return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item(), alpha_tlogs.item()
     
-    # Save model parameters
+    # 保存模型参数
     def save_checkpoint(self, env_name, suffix="", ckpt_path=None):
         if not os.path.exists('checkpoints/'):
             os.makedirs('checkpoints/')
@@ -198,7 +201,7 @@ class SAC(object):
                     'critic_optimizer_state_dict': self.critic_optim.state_dict(),
                     'policy_optimizer_state_dict': self.policy_optim.state_dict()}, ckpt_path)
 
-    # Load model parameters
+    # 加载模型参数
     def load_checkpoint(self, ckpt_path, evaluate=False):
         print('Loading models from {}'.format(ckpt_path))
         if ckpt_path is not None:
@@ -247,7 +250,7 @@ class ValueNetwork(nn.Module):
         x = self.linear3(x)
         return x
 
-# 定义Soft Q-network
+# 定义Soft Q-network，价值网络定义
 class QNetwork(nn.Module):
     def __init__(self, num_inputs, num_actions, hidden_dim):
         super(QNetwork, self).__init__()
@@ -264,7 +267,7 @@ class QNetwork(nn.Module):
 
         self.apply(weights_init_)
 
-    def forward(self, state, action):
+    def forward(self, state, action):# 定义前向传播函数
         xu = torch.cat([state, action], 1)
 
         x1 = F.relu(self.linear1(xu))
@@ -277,7 +280,7 @@ class QNetwork(nn.Module):
 
         return x1, x2
 
-class GaussianPolicy(nn.Module):
+class GaussianPolicy(nn.Module):# Actor网络定义
     def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None):
         super(GaussianPolicy, self).__init__()
         
@@ -285,7 +288,7 @@ class GaussianPolicy(nn.Module):
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
 
         self.mean_linear = nn.Linear(hidden_dim, num_actions)
-        self.log_std_linear = nn.Linear(hidden_dim, num_actions)
+        self.log_std_linear = nn.Linear(hidden_dim, num_actions) 
 
         self.apply(weights_init_)
 
@@ -299,7 +302,7 @@ class GaussianPolicy(nn.Module):
             self.action_bias = torch.FloatTensor(
                 (action_space.high + action_space.low) / 2.)
 
-    def forward(self, state):
+    def forward(self, state):# 前向传播函数定义
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
         mean = self.mean_linear(x)
@@ -307,7 +310,7 @@ class GaussianPolicy(nn.Module):
         log_std = torch.clamp(log_std, min=LOG_SIG_MIN, max=LOG_SIG_MAX)
         return mean, log_std
 
-    def sample(self, state):
+    def sample(self, state):# 动作采样以及概率计算函数
         mean, log_std = self.forward(state)
         std = log_std.exp()
         normal = Normal(mean, std)
