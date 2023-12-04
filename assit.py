@@ -18,5 +18,5 @@ def assit(focal_length):
     R3 = (a * focal_length) / D3
     return R1, R2, R3
 
-#z1, z2, z3 = assit(0.129)
+#z1, z2, z3 = assit(0.0043)
 #print(f"{z1, z2, z3}")

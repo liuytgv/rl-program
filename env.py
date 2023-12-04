@@ -57,7 +57,7 @@ class CameraControlEnv(gym.Env):
 
         # 定义连续动作空间，例如控制相机方位角、俯仰角和焦距的连续值
         self.state_dim = 9  # 新增：状态空间为11维
-        self.observation_dim = 5
+        self.observation_dim = 4
         self.action_dim = 2  # 动作维度为2维，包括方位角、俯仰角
         self.total_reward = 0
 
@@ -101,7 +101,7 @@ class CameraControlEnv(gym.Env):
     def reset(self):
         self.shared_data.azimuth = 0
         self.shared_data.elevation = 45
-        self.shared_data.focal_length = 0.0043
+        self.shared_data.focal_length = 0.129
         self.shared_data.gud_a = 0  # 新增：重置gud_a为0
         self.shared_data.gud_e = 0  # 新增：重置gud_e为0
         self.x, self.y, self.z = self.trajectory[0] - self.camera_pos
@@ -136,6 +136,7 @@ class CameraControlEnv(gym.Env):
 
         prev_focal_length = self.shared_data.focal_length
         _, _, R3 = assit(prev_focal_length)
+        #print(R3)
         target_vector = np.array([self.x, self.y, self.z])
         distance = np.linalg.norm(target_vector)
 
@@ -147,9 +148,9 @@ class CameraControlEnv(gym.Env):
         focal_length = prev_focal_length + focal_action
 
         if focal_length > 0.129:
-            focal_length = 0.129           
+            focal_length = 0.06           
         if focal_length < 0.0043:
-            focal_length = 0.0043
+            focal_length = 0.06
         
         self.shared_data.focal_length = focal_length
 
@@ -166,9 +167,9 @@ class CameraControlEnv(gym.Env):
         state = np.array([
             self.shared_data.azimuth,
             self.shared_data.elevation,
-            self.shared_data.focal_length,
             self.shared_data.gud_a,  # 新增：gud_a
             self.shared_data.gud_e,  # 新增：gud_e
+            self.shared_data.focal_length,
             self.x,
             self.y,
             self.z,
@@ -209,6 +210,7 @@ class CameraControlEnv(gym.Env):
         fov_adjusted2 = fov_adjusted1 / self.aspect_ratio
         fov_adjusted2 = round(fov_adjusted2, 2)
         fov_adjusted2 = fov_adjusted2 / 2
+        self.gud_e, self.gud_a = guidance.gd(elevation_deg, azimuth_deg)
 
         gap_a = np.abs(azimuth_deg - azimuth)
         gap_e = np.abs(elevation_deg - elevation)
@@ -216,13 +218,10 @@ class CameraControlEnv(gym.Env):
         reward_a = (fov_adjusted1 - gap_a) / fov_adjusted1
         reward_e = (fov_adjusted2 - gap_e) / fov_adjusted2
 
-        reward_a1 = max(reward_a, -1)
-        reward_e1 = max(reward_e, -1)
 
-        reward0 = (reward_a1 + reward_e1) / 2
+        reward0 = (reward_a + reward_e) / 2
 
         # 对真实方位信息模糊后获得指引信息
-        self.gud_e, self.gud_a = guidance.gd(elevation_deg, azimuth_deg)
         self.shared_data.gud_e = self.gud_e
         self.shared_data.gud_a = self.gud_a
         # print(f"{self.gud_a, self.gud_e, azimuth_deg, elevation_deg}")

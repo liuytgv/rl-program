@@ -69,10 +69,10 @@ while len(agent.buffer) < initial_buffer_size:
     done = False
 
     while not done:
-        observation = state[:5]
+        observation = state[:4]
         action = env.action_space.sample()  # 随机动作，用于填充缓冲区
         next_state, reward, done, _ = env.step(action)
-        next_observation = next_state[:5]
+        next_observation = next_state[:4]
         agent.buffer.push(observation, action, reward, next_observation, done)
         state = next_state
 
@@ -84,14 +84,14 @@ for episode in range(max_episodes):
     done = False
 
     while not done:
-        observation = state[:5]
+        observation = state[:4]
         #print(observation)
 
         action = agent.select_action(observation)
         #print(action)
         
         next_state, reward, done, _ = env.step(action)
-        next_observation = next_state[:5]
+        next_observation = next_state[:4]
         agent.buffer.push(observation, action, reward, next_observation, done)
         state = next_state
         total_reward += reward

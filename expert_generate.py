@@ -49,8 +49,8 @@ for episode in range(max_episodes):
     done = False
 
     while not done:
-        azimuth, elevation, focal_length, gud_a, gud_e, x, y, z, current_t = state
-        observation = state[:5]
+        azimuth, elevation, gud_a, gud_e, focal_length, x, y, z, current_t = state
+        observation = state[:4]
         #print(observation)
 
         # 计算目标相对于相机的位置矢量
@@ -94,7 +94,7 @@ for episode in range(max_episodes):
         next_state, reward, done, _ = env.step(action)
         # 打印获得的奖励
         # print(f"Reward: {reward}")
-        next_observation = next_state[:5]
+        next_observation = next_state[:4]
         agent.buffer.push(observation, action, reward, next_observation, done)
         # print(f"{len(agent.buffer)}")
         # 保存 Replay Buffer
